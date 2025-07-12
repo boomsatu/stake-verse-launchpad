@@ -22,7 +22,7 @@ import { useAccount } from "wagmi";
 import { toast } from "@/hooks/use-toast";
 import { STAKING_CONTRACT_ADDRESS, TOKEN_CONTRACT_ADDRESS } from "@/contracts/abi";
 
-type PoolType = 0 | 1; // 0: FLEXIBLE, 1: FIXED_12_MONTHS
+type PoolType = 0 | 1 | 2 | 3 | 4 | 5; // 0: FLEXIBLE, 1: FIXED_3_MONTHS, 2: FIXED_6_MONTHS, 3: FIXED_9_MONTHS, 4: FIXED_12_MONTHS, 5: FIXED_24_MONTHS
 
 interface StakeOption {
   type: PoolType;
@@ -32,11 +32,12 @@ interface StakeOption {
   minAmount: string;
   description: string;
   lockPeriod?: string;
+  bonus: string;
   features: string[];
 }
 
 export const Stake = () => {
-  const [selectedOption, setSelectedOption] = useState<PoolType>(0);
+  const [selectedOptions, setSelectedOptions] = useState<PoolType[]>([0]);
   const [amount, setAmount] = useState("");
   const { address, isConnected } = useAccount();
 
@@ -47,24 +48,82 @@ export const Stake = () => {
       duration: "No lock period",
       apy: "8.5%",
       minAmount: "100",
-      description: "Withdraw anytime with no penalties. Perfect for users who want liquidity.",
-      features: ["Instant withdrawal", "Daily rewards", "No lock period", "Lower gas fees"]
+      bonus: "0.5% Daily Bonus",
+      description: "Withdraw anytime with no penalties. Get 24-hour bonus rewards.",
+      features: ["Instant withdrawal", "24h bonus claims", "No lock period", "Lower gas fees"]
     },
     1: {
       type: 1,
-      name: "Fixed-Term Staking",
-      duration: "12 months",
-      apy: "18.2%",
+      name: "3 Month Lock",
+      duration: "3 months",
+      apy: "12%",
+      minAmount: "500",
+      bonus: "1% Completion Bonus",
+      description: "Short-term commitment with solid returns and completion bonus.",
+      lockPeriod: "90 days",
+      features: ["12% APY", "1% bonus", "Quarterly rewards", "Early exit penalty"]
+    },
+    2: {
+      type: 2,
+      name: "6 Month Lock",
+      duration: "6 months",
+      apy: "15%",
+      minAmount: "750",
+      bonus: "2% Completion Bonus",
+      description: "Medium-term staking with higher rewards and bonus multiplier.",
+      lockPeriod: "180 days",
+      features: ["15% APY", "2% bonus", "Bi-annual rewards", "Enhanced security"]
+    },
+    3: {
+      type: 3,
+      name: "9 Month Lock",
+      duration: "9 months",
+      apy: "17.5%",
       minAmount: "1000",
-      description: "Higher rewards for long-term commitment. Funds locked for 12 months.",
+      bonus: "3% Completion Bonus",
+      description: "Extended commitment with premium rewards and bonuses.",
+      lockPeriod: "270 days",
+      features: ["17.5% APY", "3% bonus", "Quarterly compounding", "Priority support"]
+    },
+    4: {
+      type: 4,
+      name: "12 Month Lock",
+      duration: "12 months",
+      apy: "20%",
+      minAmount: "1500",
+      bonus: "5% Completion Bonus",
+      description: "Annual commitment with maximum rewards and substantial bonus.",
       lockPeriod: "365 days",
-      features: ["Maximum rewards", "Compound interest", "Early withdrawal penalty", "Premium APY"]
+      features: ["20% APY", "5% bonus", "Monthly rewards", "VIP benefits"]
+    },
+    5: {
+      type: 5,
+      name: "24 Month Lock",
+      duration: "24 months",
+      apy: "25%",
+      minAmount: "2500",
+      bonus: "10% Completion Bonus",
+      description: "Ultimate long-term staking with maximum APY and premium bonuses.",
+      lockPeriod: "730 days",
+      features: ["25% APY", "10% bonus", "Compound growth", "Exclusive rewards"]
     }
   };
 
-  const currentOption = stakeOptions[selectedOption];
+  const getCurrentOption = () => {
+    return selectedOptions.length === 1 ? stakeOptions[selectedOptions[0]] : null;
+  };
 
-  const handleStake = async () => {
+  const handleOptionToggle = (optionType: PoolType) => {
+    setSelectedOptions(prev => {
+      if (prev.includes(optionType)) {
+        return prev.filter(t => t !== optionType);
+      } else {
+        return [...prev, optionType];
+      }
+    });
+  };
+
+  const handleStake = async (poolType: PoolType) => {
     if (!isConnected) {
       toast({
         title: "Wallet not connected",
@@ -74,10 +133,11 @@ export const Stake = () => {
       return;
     }
 
-    if (!amount || parseFloat(amount) < parseFloat(currentOption.minAmount)) {
+    const option = stakeOptions[poolType];
+    if (!amount || parseFloat(amount) < parseFloat(option.minAmount)) {
       toast({
         title: "Invalid amount",
-        description: `Minimum stake amount is ${currentOption.minAmount} tokens.`,
+        description: `Minimum stake amount is ${option.minAmount} tokens for ${option.name}.`,
         variant: "destructive"
       });
       return;
@@ -86,15 +146,16 @@ export const Stake = () => {
     // Smart contract integration would go here
     toast({
       title: "Stake submitted",
-      description: `Successfully staked ${amount} tokens in ${currentOption.name.toLowerCase()}.`,
+      description: `Successfully staked ${amount} tokens in ${option.name}.`,
     });
     
     setAmount("");
   };
 
-  const calculateEstimatedRewards = () => {
+  const calculateEstimatedRewards = (poolType: PoolType) => {
     if (!amount) return "0";
-    const yearly = parseFloat(amount) * parseFloat(currentOption.apy) / 100;
+    const option = stakeOptions[poolType];
+    const yearly = parseFloat(amount) * parseFloat(option.apy) / 100;
     return yearly.toFixed(2);
   };
 
@@ -103,10 +164,10 @@ export const Stake = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl font-bold mb-4">
-            Professional <span className="bg-gradient-primary bg-clip-text text-transparent">Staking Protocol</span>
+            Multi-Tier <span className="bg-gradient-primary bg-clip-text text-transparent">Staking Protocol</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Advanced DeFi staking with real-time rewards calculation and comprehensive analytics
+            Choose from 6 staking pools with flexible terms, daily bonuses, and completion rewards
           </p>
         </div>
 
@@ -159,14 +220,21 @@ export const Stake = () => {
                         <div
                           key={option.type}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                            selectedOption === option.type
+                            selectedOptions.includes(option.type)
                               ? "border-primary bg-primary/10"
                               : "border-border hover:border-primary/50"
                           }`}
-                          onClick={() => setSelectedOption(option.type)}
+                          onClick={() => handleOptionToggle(option.type)}
                         >
                           <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-semibold">{option.name}</h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold">{option.name}</h3>
+                              {selectedOptions.includes(option.type) && (
+                                <Badge variant="outline" className="text-xs">
+                                  Selected
+                                </Badge>
+                              )}
+                            </div>
                             <Badge variant={option.type === 0 ? "secondary" : "default"}>
                               {option.apy} APY
                             </Badge>
@@ -180,6 +248,10 @@ export const Stake = () => {
                             <div className="flex justify-between">
                               <span>Min Amount:</span>
                               <span className="text-muted-foreground">{option.minAmount} TOKEN</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Bonus:</span>
+                              <span className="text-primary font-medium">{option.bonus}</span>
                             </div>
                           </div>
 
@@ -224,10 +296,10 @@ export const Stake = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Wallet className="h-5 w-5 text-primary" />
-                      Stake {currentOption.name}
+                      Multi-Pool Staking
                     </CardTitle>
                     <CardDescription>
-                      {currentOption.description}
+                      Select multiple pools and stake tokens with different strategies
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -260,64 +332,86 @@ export const Stake = () => {
 
                     <Separator />
 
-                    {/* Staking Preview */}
-                    <div className="space-y-4 p-4 bg-secondary/50 rounded-lg">
-                      <h4 className="font-medium flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        Staking Preview
-                      </h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Staking Amount:</span>
-                          <span className="font-mono">{amount || "0"} TOKEN</span>
+                    {/* Selected Pools Summary */}
+                    {selectedOptions.length > 0 && (
+                      <div className="space-y-4 p-4 bg-secondary/50 rounded-lg">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <DollarSign className="h-4 w-4" />
+                          Selected Pools ({selectedOptions.length})
+                        </h4>
+                        <div className="space-y-3">
+                          {selectedOptions.map((poolType) => {
+                            const option = stakeOptions[poolType];
+                            return (
+                              <div key={poolType} className="p-3 bg-background/50 rounded border">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium">{option.name}</span>
+                                  <Badge variant={poolType === 0 ? "secondary" : "default"}>
+                                    {option.apy} APY
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>Min: {option.minAmount} TOKEN</div>
+                                  <div>Bonus: {option.bonus}</div>
+                                  <div>Duration: {option.duration}</div>
+                                  <div>Est. Rewards: {calculateEstimatedRewards(poolType)} TOKEN</div>
+                                </div>
+                                <div className="mt-3">
+                                  <Button 
+                                    onClick={() => handleStake(poolType)}
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="w-full"
+                                    disabled={!isConnected || !amount || parseFloat(amount || "0") < parseFloat(option.minAmount)}
+                                  >
+                                    Stake in {option.name}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div className="flex justify-between">
-                          <span>Pool Type:</span>
-                          <Badge variant={selectedOption === 0 ? "secondary" : "default"}>
-                            {currentOption.name}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>APY:</span>
-                          <span className="text-primary font-bold">{currentOption.apy}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Est. Annual Rewards:</span>
-                          <span className="text-primary font-mono">
-                            {calculateEstimatedRewards()} TOKEN
-                          </span>
-                        </div>
-                        {currentOption.lockPeriod && (
-                          <div className="flex justify-between">
-                            <span>Lock Period:</span>
-                            <span className="text-muted-foreground">{currentOption.lockPeriod}</span>
-                          </div>
-                        )}
                       </div>
-                    </div>
+                    )}
 
-                    {/* Action Buttons */}
-                    <div className="space-y-3">
-                      <Button 
-                        onClick={handleStake}
-                        variant="gradient" 
-                        size="lg" 
-                        className="w-full"
-                        disabled={!isConnected || !amount}
-                      >
-                        {!isConnected ? "Connect Wallet to Stake" : "Stake Tokens"}
-                      </Button>
-                    </div>
+                    {/* 24-hour Bonus for Flexible Staking */}
+                    {selectedOptions.includes(0) && (
+                      <div className="p-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg border border-primary/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Zap className="h-4 w-4 text-primary" />
+                          <span className="font-medium">24-Hour Bonus Available</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Flexible staking includes daily bonus claims. Claim your 0.5% bonus every 24 hours for active stakes.
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full border-primary/50 hover:bg-primary/10"
+                          disabled
+                        >
+                          Claim 24h Bonus (Demo)
+                        </Button>
+                      </div>
+                    )}
 
-                    {selectedOption === 1 && (
+                    {/* Warning for locked pools */}
+                    {selectedOptions.some(type => type > 0) && (
                       <div className="p-3 bg-accent/50 rounded-lg border border-border/50">
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5" />
                           <p className="text-sm text-muted-foreground">
-                            Fixed-term staking locks your tokens for 12 months. Emergency withdrawal 
-                            incurs a 5% penalty fee.
+                            Fixed-term pools lock your tokens for the specified duration. Emergency withdrawal 
+                            incurs a 5% penalty fee. Completion bonuses are awarded when pools mature.
                           </p>
                         </div>
+                      </div>
+                    )}
+
+                    {selectedOptions.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <BarChart3 className="h-12 w-12 mx-auto opacity-50 mb-4" />
+                        <p>Select one or more pools above to start staking</p>
                       </div>
                     )}
                   </CardContent>

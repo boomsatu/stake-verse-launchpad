@@ -22,7 +22,14 @@ contract TokenStaking is ReentrancyGuard, Pausable, Ownable {
     IERC20 public immutable rewardToken;
 
     // Staking pool types
-    enum PoolType { FLEXIBLE, FIXED_12_MONTHS }
+    enum PoolType { 
+        FLEXIBLE, 
+        FIXED_3_MONTHS, 
+        FIXED_6_MONTHS, 
+        FIXED_9_MONTHS, 
+        FIXED_12_MONTHS, 
+        FIXED_24_MONTHS 
+    }
 
     // Staking pool configuration
     struct Pool {
@@ -30,6 +37,7 @@ contract TokenStaking is ReentrancyGuard, Pausable, Ownable {
         uint256 minStakeAmount;     // Minimum stake amount
         uint256 lockPeriod;         // Lock period in seconds (0 for flexible)
         uint256 totalStaked;        // Total amount staked in this pool
+        uint256 bonusMultiplier;    // Bonus multiplier in basis points (1000 = 10% bonus)
         bool active;                // Pool status
     }
 
@@ -39,6 +47,7 @@ contract TokenStaking is ReentrancyGuard, Pausable, Ownable {
         uint256 startTime;          // Stake start timestamp
         uint256 lastRewardTime;     // Last reward calculation time
         uint256 accumulatedRewards; // Accumulated but unclaimed rewards
+        uint256 lastBonusClaim;     // Last bonus claim time for flexible staking
         PoolType poolType;          // Pool type
         bool active;                // Stake status
     }
@@ -71,14 +80,52 @@ contract TokenStaking is ReentrancyGuard, Pausable, Ownable {
             minStakeAmount: 100 * 10**18,  // 100 tokens
             lockPeriod: 0,      // No lock period
             totalStaked: 0,
+            bonusMultiplier: 50, // 0.5% daily bonus for 24h+ stakes
+            active: true
+        });
+        
+        pools[PoolType.FIXED_3_MONTHS] = Pool({
+            apy: 1200,          // 12% APY
+            minStakeAmount: 500 * 10**18, // 500 tokens
+            lockPeriod: 90 days,
+            totalStaked: 0,
+            bonusMultiplier: 100, // 1% bonus
+            active: true
+        });
+        
+        pools[PoolType.FIXED_6_MONTHS] = Pool({
+            apy: 1500,          // 15% APY
+            minStakeAmount: 750 * 10**18, // 750 tokens
+            lockPeriod: 180 days,
+            totalStaked: 0,
+            bonusMultiplier: 200, // 2% bonus
+            active: true
+        });
+        
+        pools[PoolType.FIXED_9_MONTHS] = Pool({
+            apy: 1750,          // 17.5% APY
+            minStakeAmount: 1000 * 10**18, // 1000 tokens
+            lockPeriod: 270 days,
+            totalStaked: 0,
+            bonusMultiplier: 300, // 3% bonus
             active: true
         });
         
         pools[PoolType.FIXED_12_MONTHS] = Pool({
-            apy: 1820,          // 18.2% APY
-            minStakeAmount: 1000 * 10**18, // 1000 tokens
+            apy: 2000,          // 20% APY
+            minStakeAmount: 1500 * 10**18, // 1500 tokens
             lockPeriod: 365 days,
             totalStaked: 0,
+            bonusMultiplier: 500, // 5% bonus
+            active: true
+        });
+        
+        pools[PoolType.FIXED_24_MONTHS] = Pool({
+            apy: 2500,          // 25% APY
+            minStakeAmount: 2500 * 10**18, // 2500 tokens
+            lockPeriod: 730 days,
+            totalStaked: 0,
+            bonusMultiplier: 1000, // 10% bonus
             active: true
         });
     }
@@ -106,6 +153,7 @@ contract TokenStaking is ReentrancyGuard, Pausable, Ownable {
             startTime: block.timestamp,
             lastRewardTime: block.timestamp,
             accumulatedRewards: 0,
+            lastBonusClaim: block.timestamp,
             poolType: poolType,
             active: true
         }));
@@ -243,9 +291,52 @@ contract TokenStaking is ReentrancyGuard, Pausable, Ownable {
         
         uint256 stakingDuration = block.timestamp - userStake.lastRewardTime;
         uint256 yearlyReward = (userStake.amount * pool.apy) / 10000;
-        uint256 reward = (yearlyReward * stakingDuration) / 365 days;
+        uint256 baseReward = (yearlyReward * stakingDuration) / 365 days;
         
-        return userStake.accumulatedRewards + reward;
+        // Calculate bonus for flexible staking (24h bonus)
+        uint256 bonusReward = 0;
+        if (userStake.poolType == PoolType.FLEXIBLE) {
+            uint256 timeSinceLastBonus = block.timestamp - userStake.lastBonusClaim;
+            if (timeSinceLastBonus >= 24 hours) {
+                uint256 bonusMultiplier = pool.bonusMultiplier;
+                bonusReward = (userStake.amount * bonusMultiplier) / 10000;
+            }
+        } else {
+            // Apply bonus multiplier for fixed staking
+            bonusReward = (baseReward * pool.bonusMultiplier) / 10000;
+        }
+        
+        return userStake.accumulatedRewards + baseReward + bonusReward;
+    }
+    
+    /**
+     * @dev Claim 24-hour bonus for flexible staking
+     * @param stakeIndex Index of stake to claim bonus for
+     */
+    function claimFlexibleBonus(uint256 stakeIndex) 
+        external 
+        nonReentrant 
+    {
+        require(stakeIndex < userStakes[msg.sender].length, "Invalid stake index");
+        
+        Stake storage userStake = userStakes[msg.sender][stakeIndex];
+        require(userStake.active, "Stake is not active");
+        require(userStake.poolType == PoolType.FLEXIBLE, "Only for flexible staking");
+        
+        uint256 timeSinceLastBonus = block.timestamp - userStake.lastBonusClaim;
+        require(timeSinceLastBonus >= 24 hours, "Bonus not available yet");
+        
+        Pool memory pool = pools[userStake.poolType];
+        uint256 bonusAmount = (userStake.amount * pool.bonusMultiplier) / 10000;
+        
+        // Update last bonus claim time
+        userStake.lastBonusClaim = block.timestamp;
+        totalRewardsDistributed += bonusAmount;
+        
+        // Transfer bonus
+        rewardToken.safeTransfer(msg.sender, bonusAmount);
+        
+        emit RewardsClaimed(msg.sender, bonusAmount);
     }
 
     /**

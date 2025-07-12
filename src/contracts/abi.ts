@@ -168,6 +168,19 @@ export const STAKING_CONTRACT_ABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "stakeIndex",
+        "type": "uint256"
+      }
+    ],
+    "name": "claimFlexibleBonus",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "user",
         "type": "address"
@@ -248,6 +261,11 @@ export const STAKING_CONTRACT_ABI = [
             "type": "uint256"
           },
           {
+            "internalType": "uint256",
+            "name": "bonusMultiplier",
+            "type": "uint256"
+          },
+          {
             "internalType": "bool",
             "name": "active",
             "type": "bool"
@@ -310,6 +328,11 @@ export const STAKING_CONTRACT_ABI = [
           {
             "internalType": "uint256",
             "name": "accumulatedRewards",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "lastBonusClaim",
             "type": "uint256"
           },
           {
