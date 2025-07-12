@@ -10,6 +10,7 @@ export const Navbar = () => {
 
   const navigation = [
     { name: "Home", href: "/" },
+    { name: "Buy Token", href: "/buy" },
     { name: "Stake", href: "/stake" },
   ];
 

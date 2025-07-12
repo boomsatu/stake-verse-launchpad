@@ -8,6 +8,7 @@ import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { config } from './config/rainbowkit';
 import { Layout } from "./components/layout/Layout";
 import { Home } from "./pages/Home";
+import { BuyToken } from "./pages/BuyToken";
 import { Stake } from "./pages/Stake";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +27,7 @@ const App = () => (
             <Layout>
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/buy" element={<BuyToken />} />
                 <Route path="/stake" element={<Stake />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
